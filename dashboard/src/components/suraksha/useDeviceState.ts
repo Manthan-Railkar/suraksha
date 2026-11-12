@@ -1,13 +1,17 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getState, type StateResponse, ApiError } from "@/lib/api";
+import { getState, type StateResponse, ApiError, DEFAULT_DEVICE_ID } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useActiveDevice } from "@/lib/device-context";
 
 /**
- * Polls GET /api/state. Shared by the overview, device and alerts screens so
- * they all agree on mode/door/connectivity without re-fetching separately.
+ * Polls GET /api/state for the active device.
+ * Shared by the overview, device and alerts screens.
  */
-export function useDeviceState(intervalMs = 3000) {
+export function useDeviceState(intervalMs = 3000, overrideDeviceId?: string) {
+  const { deviceId: contextDeviceId } = useActiveDevice();
+  const targetId = overrideDeviceId || contextDeviceId || DEFAULT_DEVICE_ID;
+
   const [data, setData] = useState<StateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { signOut } = useAuth();
@@ -15,7 +19,7 @@ export function useDeviceState(intervalMs = 3000) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await getState();
+      const res = await getState(targetId);
       setData(res);
       setError(null);
     } catch (err) {
@@ -25,7 +29,7 @@ export function useDeviceState(intervalMs = 3000) {
       }
       setError(err instanceof Error ? err.message : "Could not reach the backend");
     }
-  }, [signOut]);
+  }, [targetId, signOut]);
 
   useEffect(() => {
     refresh();
@@ -35,5 +39,5 @@ export function useDeviceState(intervalMs = 3000) {
     };
   }, [refresh, intervalMs]);
 
-  return { data, error, refresh };
+  return { data, error, refresh, deviceId: targetId };
 }

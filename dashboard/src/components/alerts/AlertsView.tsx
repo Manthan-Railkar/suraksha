@@ -9,6 +9,7 @@ import { isAlert } from "@/lib/suraksha";
 import PageHeader from "@/components/suraksha/PageHeader";
 import FilterChips from "@/components/suraksha/FilterChips";
 import EventItem from "@/components/suraksha/EventItem";
+import DeviceSelector from "@/components/suraksha/DeviceSelector";
 import { useEvents } from "@/components/suraksha/useEvents";
 
 type Tab = "active" | "acknowledged";
@@ -17,7 +18,7 @@ export default function AlertsView() {
   const ref = useRef<HTMLDivElement>(null);
   usePageEntrance(ref);
 
-  const { events, loaded, error, acknowledge } = useEvents({ limit: 200, intervalMs: 4000 });
+  const { events, loaded, error, acknowledge, deviceId } = useEvents({ limit: 200, intervalMs: 4000 });
   const [tab, setTab] = useState<Tab>("active");
   const [busy, setBusy] = useState(false);
 
@@ -54,9 +55,10 @@ export default function AlertsView() {
     <div ref={ref} data-page className="absolute inset-0 overflow-y-auto overflow-x-hidden">
       <div className="relative flex min-h-full w-full flex-col gap-[20px]" style={{ padding: "24px 32px 32px 110px" }}>
         <PageHeader
-          title="Alerts"
-          subtitle="Warnings and alarms from the device. Acknowledging marks an alert as seen - it is never deleted."
+          title="Security Alerts"
+          subtitle={`Warnings and alarms reported by ${deviceId}. Acknowledging marks an alert as resolved without deleting it.`}
         >
+          <DeviceSelector />
           {active.length > 1 && (
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -64,7 +66,7 @@ export default function AlertsView() {
               onClick={ackAll}
               className="flex h-[32px] items-center gap-[6px] rounded-full bg-forest-2 px-[16px] text-[11px] font-medium text-white shadow-sm disabled:opacity-60 dark:bg-mint dark:text-forest"
             >
-              <CheckCheck size={13} /> Acknowledge all
+              <CheckCheck size={13} /> Acknowledge all ({active.length})
             </motion.button>
           )}
         </PageHeader>
@@ -98,7 +100,9 @@ export default function AlertsView() {
                   {!loaded ? "Loading alerts..." : tab === "active" ? "No active alerts" : "No acknowledged alerts yet"}
                 </p>
                 <p className="text-[10.5px] text-muted">
-                  {tab === "active" ? "New warnings and alarms from the device will appear here." : "Alerts you acknowledge move here and stay in history."}
+                  {tab === "active"
+                    ? `Door openings while armed or repeated knocks on ${deviceId} will trigger an alert.`
+                    : "Acknowledged alarms and warnings will remain archived here."}
                 </p>
               </div>
             </div>
@@ -106,11 +110,6 @@ export default function AlertsView() {
             list.map((e) => <EventItem key={e.event_id} event={e} onAck={ack} busy={busy} />)
           )}
         </Card>
-
-        <p data-fill className="text-[10px] leading-[15px] text-muted">
-          A vibration alert means the sensor felt an impact above its threshold. Vibration followed by the door opening is
-          flagged as suspicious activity - it is a heuristic, not proof of forced entry.
-        </p>
       </div>
     </div>
   );

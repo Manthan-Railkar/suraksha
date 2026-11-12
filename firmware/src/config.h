@@ -13,6 +13,12 @@
 #define PIN_LED_ALARM     14   // VERIFY
 #define PIN_MODE_BUTTON   -1   // optional local arm/disarm/silence button (active LOW, internal pull-up)
 
+// UV Sensor (physical environmental telemetry on ADC1 pin)
+// Strictly for environmental monitoring - NEVER interpreted as an intrusion alert.
+#define ENABLE_UV_SENSOR          1
+#define PIN_UV_SENSOR             35   // ADC1_CH7 on ESP32 DevKit, safe analog input
+#define UV_SAMPLE_INTERVAL_MS     2000 // Sample rate for environmental telemetry
+
 // Optional HC-SR04 (blueprint F-09). The manual's TRIG/ECHO mapping is inconsistent - verify first.
 // ECHO is 5 V: put a voltage divider (e.g. 1k + 2k) between ECHO and the ESP32 pin.
 #define ENABLE_PROXIMITY  0
@@ -47,7 +53,11 @@
 #define OUTAGE_AFTER_FAILURES     3       // consecutive failed status posts before we call it an outage
 #define NTP_SERVER                "pool.ntp.org"
 
-#define FIRMWARE_VERSION          "suraksha-fw-0.1.0"
+#ifdef WOKWI_SIMULATION
+  #define FIRMWARE_VERSION        "suraksha-fw-0.2.0-wokwi"
+#else
+  #define FIRMWARE_VERSION        "suraksha-fw-0.2.0"
+#endif
 
 // Set to 1 for Phase 1 of the build plan: pulse each LED and the buzzer once at boot.
 #define RUN_OUTPUT_TEST_ON_BOOT   1

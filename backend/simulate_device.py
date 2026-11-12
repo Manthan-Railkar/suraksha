@@ -3,10 +3,12 @@
 It follows the same rules the real firmware will (blueprint section 8), so treat it
 as an executable spec for the C++ later.
 
-Run:  python simulate_device.py
+Run:  python simulate_device.py [--device-id ID]
 Keys: o = open door   c = close door   v = vibration (knock)
+      u = cycle UV reading (environmental telemetry)
       r = reset local alarm   s = show state   q = quit
 """
+import argparse
 import os
 import sys
 import threading
@@ -19,9 +21,14 @@ from dotenv import load_dotenv
 
 load_dotenv()  # read DEVICE_TOKEN etc. from backend/.env, same as main.py
 
-BASE = os.getenv("SURAKSHA_URL", "http://localhost:8000")
+parser = argparse.ArgumentParser(description="Suraksha Device Simulator")
+parser.add_argument("--device-id", default=os.getenv("DEFAULT_DEVICE_ID", "suraksha-esp32-01"), help="Device ID to simulate")
+parser.add_argument("--url", default=os.getenv("SURAKSHA_URL", "http://localhost:8000"), help="Backend URL")
+args, _ = parser.parse_known_args()
+
+BASE = args.url
 TOKEN = os.getenv("DEVICE_TOKEN", "dev-device-token")
-DEVICE_ID = os.getenv("DEFAULT_DEVICE_ID", "suraksha-esp32-01")
+DEVICE_ID = args.device_id
 HEADERS = {"X-Device-Token": TOKEN}
 
 VIB_WINDOW_S = 10    # repeated-vibration window
@@ -30,8 +37,11 @@ COMBO_WINDOW_S = 10  # vibration -> door open within this window = higher priori
 HEARTBEAT_S = 5
 POLL_S = 2
 
+UV_LEVELS = [0.0, 1.5, 3.8, 6.2, 8.9, 11.4]
+uv_idx = 1
+
 lock = threading.Lock()
-state = {"mode": "DISARMED", "door": "CLOSED", "alarm": False}
+state = {"mode": "DISARMED", "door": "CLOSED", "alarm": False, "uv_index": UV_LEVELS[uv_idx]}
 vib_times: list[float] = []
 last_vib = 0.0
 outbox: list[dict] = []  # events waiting to be sent (the "buffer" T-08 needs)
@@ -43,7 +53,7 @@ def ts() -> str:
 
 
 def log(msg: str) -> None:
-    print(f"[{time.strftime('%H:%M:%S')}] {msg}")
+    print(f"[{time.strftime('%H:%M:%S')}] [{DEVICE_ID}] {msg}")
 
 
 def emit(event_type: str, severity: str) -> None:
@@ -68,7 +78,8 @@ def status_payload() -> dict:
         "door_state": state["door"],
         "vibration_state": "TRIGGERED" if time.time() - last_vib < 3 else "IDLE",
         "alarm_active": state["alarm"],
-        "firmware_version": "sim-0.1",
+        "uv_index": state["uv_index"],
+        "firmware_version": "sim-0.2.0",
         "device_timestamp": ts(),
     }
 
@@ -103,12 +114,24 @@ def poll_command() -> None:
         cmd = r.json()["command"]
         if not cmd:
             return
+        
+        ok = True
+        err = None
         with lock:
-            state["mode"] = "ARMED" if cmd["command_type"] == "ARM" else "DISARMED"
-            state["alarm"] = False
-        log(f"COMMAND {cmd['command_type']} applied")
+            if cmd["command_type"] == "ARM" and state["door"] == "OPEN":
+                ok = False
+                err = "Door is open - close it before arming"
+            else:
+                state["mode"] = "ARMED" if cmd["command_type"] == "ARM" else "DISARMED"
+                state["alarm"] = False
+        
+        status_str = "applied" if ok else f"failed: {err}"
+        log(f"COMMAND {cmd['command_type']} -> {status_str}")
+        ack_payload = {"device_id": DEVICE_ID, "success": ok}
+        if err:
+            ack_payload["error"] = err
         requests.post(f"{BASE}/api/device/commands/{cmd['command_id']}/ack",
-                      json={"device_id": DEVICE_ID, "success": True}, headers=HEADERS, timeout=3)
+                      json=ack_payload, headers=HEADERS, timeout=3)
         send_status()
     except requests.RequestException:
         pass
@@ -167,10 +190,20 @@ def vibration() -> None:
     send_status()
 
 
+def cycle_uv() -> None:
+    global uv_idx
+    with lock:
+        uv_idx = (uv_idx + 1) % len(UV_LEVELS)
+        state["uv_index"] = UV_LEVELS[uv_idx]
+        log(f"UV TELEMETRY: {state['uv_index']} index (environmental only)")
+    send_status()
+
+
 def main() -> None:
     global running
     threading.Thread(target=network_loop, daemon=True).start()
     print(__doc__)
+    log(f"Simulator active for {DEVICE_ID} connecting to {BASE}")
     try:
         for line in sys.stdin:
             k = line.strip().lower()
@@ -180,6 +213,8 @@ def main() -> None:
                 door_close()
             elif k == "v":
                 vibration()
+            elif k == "u":
+                cycle_uv()
             elif k == "r":
                 with lock:
                     state["alarm"] = False

@@ -15,6 +15,7 @@ struct StatusReport {
   bool vibrationTriggered;
   bool alarmActive;
   float proximityCm;  // negative = not available
+  float uvIndex;      // negative = not available (environmental telemetry)
 };
 
 struct PendingCommand {

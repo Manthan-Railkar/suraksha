@@ -1,11 +1,12 @@
 "use client";
 import { useRef, type ReactNode } from "react";
-import { Cpu, Info, Wifi } from "lucide-react";
+import { Cpu, Info, Sun, Wifi } from "lucide-react";
 import Card from "@/components/ui/Card";
 import { usePageEntrance } from "@/lib/entrance";
-import { agoFromSeconds, formatWhen, systemLevel, timeAgo } from "@/lib/suraksha";
+import { agoFromSeconds, formatWhen, systemLevel, timeAgo, uvTone } from "@/lib/suraksha";
 import PageHeader from "@/components/suraksha/PageHeader";
 import StatusPill from "@/components/suraksha/StatusPill";
+import DeviceSelector from "@/components/suraksha/DeviceSelector";
 import { useDeviceState } from "@/components/suraksha/useDeviceState";
 
 function Row({ k, children }: { k: string; children: ReactNode }) {
@@ -34,16 +35,17 @@ function CardTitle({ icon: Icon, title, sub }: { icon: typeof Cpu; title: string
 /** Blueprint section 15 - what each sensor can and cannot establish. */
 const LIMITS = [
   ["Magnetic reed switch", "Whether the door is physically open or closed.", "Whether the mechanical lock is locked, picked or secure."],
-  ["Vibration sensor", "That an impact above the set threshold occurred.", "That a forced entry happened, or who caused it."],
+  ["Vibration sensor", "That an impact or knock above the threshold occurred.", "That a forced entry happened, or who caused it."],
+  ["Analog UV sensor (environmental)", "Ambient solar ultraviolet radiation levels.", "Cannot detect human motion, presence, or intrusion events."],
   ["Proximity sensor (optional)", "That an object is within a measured distance.", "That it is a person, who they are, or what they intend."],
-  ["Wi-Fi dashboard", "Remote visibility while device, network and backend are up.", "Guaranteed delivery during outages."],
+  ["Wi-Fi dashboard", "Remote visibility while device, network and backend are up.", "Guaranteed delivery during power/network outages."],
 ];
 
 export default function DeviceView() {
   const ref = useRef<HTMLDivElement>(null);
   usePageEntrance(ref);
 
-  const { data, error } = useDeviceState();
+  const { data, error, deviceId } = useDeviceState();
   const device = data?.device ?? null;
   const state = data?.state ?? null;
   const online = !!device?.is_online;
@@ -51,10 +53,14 @@ export default function DeviceView() {
   const serverTime = data?.server_time;
   const cmd = data?.last_command ?? null;
 
+  const isSim = deviceId.includes("wokwi") || deviceId.includes("sim");
+  const uvInfo = uvTone(state?.uv_index);
+
   return (
     <div ref={ref} data-page className="absolute inset-0 overflow-y-auto overflow-x-hidden">
       <div className="relative flex min-h-full w-full flex-col gap-[20px]" style={{ padding: "24px 32px 32px 110px" }}>
-        <PageHeader title="Device Health" subtitle="Connection, sync and sensor status reported by the ESP32.">
+        <PageHeader title="Device Health" subtitle="Connection, telemetry, and sensor status reported by the ESP32.">
+          <DeviceSelector />
           <StatusPill label={online ? "ONLINE" : device ? "OFFLINE" : "NO REPORT"} tone={online ? "ok" : "alarm"} />
         </PageHeader>
 
@@ -65,19 +71,26 @@ export default function DeviceView() {
         )}
 
         <div className="grid grid-cols-1 gap-[20px] lg:grid-cols-2">
+          {/* Identity & Hardware Card */}
           <Card className="p-[20px]">
-            <CardTitle icon={Cpu} title="Device" sub="Identity as registered with the backend" />
+            <CardTitle icon={Cpu} title="Device & Hardware" sub="Identity as registered with the backend" />
             <dl data-fill>
               <Row k="Name">{device?.device_name ?? "-"}</Row>
-              <Row k="Device ID">{device?.device_id ?? "-"}</Row>
+              <Row k="Device ID">{device?.device_id ?? deviceId}</Row>
+              <Row k="Environment">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-mint">
+                  {isSim ? "Wokwi / Virtual Simulator" : "Physical EDU-ROBO V14 PCB"}
+                </span>
+              </Row>
               <Row k="Firmware">{device?.firmware_version ?? "not reported"}</Row>
-              <Row k="Mode">{state?.mode ?? "-"}</Row>
+              <Row k="Active Mode">{state?.mode ?? "-"}</Row>
               <Row k="Overall status">
                 <StatusPill label={level.label} tone={level.tone} />
               </Row>
             </dl>
           </Card>
 
+          {/* Connectivity Card */}
           <Card className="p-[20px]">
             <CardTitle icon={Wifi} title="Connectivity" sub="Wi-Fi to backend, as seen by the backend" />
             <dl data-fill>
@@ -85,11 +98,11 @@ export default function DeviceView() {
                 <StatusPill label={online ? "ONLINE" : device ? "OFFLINE" : "NO REPORT"} tone={online ? "ok" : "alarm"} />
               </Row>
               <Row k="Last seen">{device ? `${agoFromSeconds(device.seconds_since_seen)} (${formatWhen(device.last_seen_at)})` : "-"}</Row>
-              <Row k="Last successful state sync">{state ? `${timeAgo(state.updated_at, serverTime)} (${formatWhen(state.updated_at)})` : "-"}</Row>
+              <Row k="Last state sync">{state ? `${timeAgo(state.updated_at, serverTime)} (${formatWhen(state.updated_at)})` : "-"}</Row>
               <Row k="Last command">
                 {cmd ? `${cmd.command_type} - ${cmd.status}${cmd.applied_at ? `, ${timeAgo(cmd.applied_at, serverTime)}` : ""}` : "none"}
               </Row>
-              <Row k="Backend link from this dashboard">
+              <Row k="Backend link from dashboard">
                 <StatusPill label={error ? "UNREACHABLE" : data ? "OK" : "CONNECTING"} tone={error ? "alarm" : data ? "ok" : "neutral"} />
               </Row>
             </dl>
@@ -102,6 +115,26 @@ export default function DeviceView() {
           </Card>
         </div>
 
+        {/* Environmental & Sensor Telemetry Card */}
+        <Card className="p-[20px]">
+          <CardTitle icon={Sun} title="Environmental Telemetry (UV Sensor)" sub="Physical analog sensor on GPIO35 - strictly non-intrusion" />
+          <dl data-fill className="grid grid-cols-1 sm:grid-cols-2 gap-x-[24px]">
+            <Row k="UV Index (WHO Scale)">
+              <span className="font-semibold text-mint">
+                {state && state.uv_index !== null && state.uv_index !== undefined ? `${state.uv_index.toFixed(1)} UV` : "Not reported"}
+              </span>
+            </Row>
+            <Row k="Exposure Hazard Rating">
+              <StatusPill label={uvInfo.label} tone={uvInfo.tone} />
+            </Row>
+            <Row k="Classification Guide">{uvInfo.desc}</Row>
+            <Row k="Security Rule Role">
+              <span className="text-[10px] text-muted">Independent environmental telemetry (never triggers alarms)</span>
+            </Row>
+          </dl>
+        </Card>
+
+        {/* Blueprint Capabilities & Constraints */}
         <Card className="p-[20px]">
           <CardTitle icon={Info} title="What the sensors can and can't tell you" sub="Suraksha is a monitoring prototype, not a certified alarm system" />
           <div data-fill className="mt-[4px] overflow-x-auto">

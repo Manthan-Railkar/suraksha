@@ -7,12 +7,14 @@
  * They only share a small snapshot, an event queue and a one-slot command mailbox.
  *
  * Suraksha only MONITORS the door. It never locks, unlocks or actuates the mechanical lock.
+ * UV sensor data is independent environmental telemetry and never interpreted as an intrusion event.
  */
 #include <Arduino.h>
 #include "config.h"
 #include "sensors/door_sensor.h"
 #include "sensors/vibration_sensor.h"
 #include "sensors/proximity_sensor.h"
+#include "sensors/uv_sensor.h"
 #include "security/alarm_controller.h"
 #include "security/security_state.h"
 #include "network/api_client.h"
@@ -23,6 +25,7 @@
 static DoorSensor door;
 static VibrationSensor vibration;
 static ProximitySensor proximity;
+static UvSensor uvSensor;
 static AlarmController alarmCtl;  // not "alarm": that collides with POSIX alarm()
 static SecurityState security;
 static EventQueue eventQueue;
@@ -31,12 +34,13 @@ static EventQueue eventQueue;
 struct Shared {
   bool armed = false, doorOpen = false, vibration = false, alarm = false;
   float proximityCm = -1;
-  bool dirty = true;  // something changed -> send a status report now instead of waiting for the heartbeat
+  float uvIndex = -1;       // Environmental telemetry only
+  bool dirty = true;        // something changed -> send a status report now instead of waiting for the heartbeat
 
   bool cmdPending = false;  // network task -> sensing task
   PendingCommand cmd{};
 
-  bool resultReady = false;  // sensing task -> network task
+  bool resultReady = false; // sensing task -> network task
   uint32_t resultId = 0;
   bool resultOk = false;
   char resultError[64] = {0};
@@ -63,6 +67,7 @@ static void publishSnapshot(uint32_t now) {
   g.vibration = vib;
   g.alarm = alarmCtl.active();
   g.proximityCm = proximity.lastCm();
+  g.uvIndex = uvSensor.lastUvIndex();
   if (changed) g.dirty = true;
   UNLOCK();
 }
@@ -80,6 +85,7 @@ static void handleCommand() {
   if (cmd.arm && security.doorOpen()) {
     ok = false;
     err = "Door is open - close it before arming";
+    Serial.println("[cmd] ARM rejected: door is open");
   } else {
     security.setArmed(cmd.arm);
     Serial.printf("[cmd] %s applied\n", cmd.arm ? "ARM" : "DISARM");
@@ -153,10 +159,10 @@ static void netTask(void*) {
       continue;
     }
 
-    // 1) Heartbeat + current state
+    // 1) Heartbeat + current state (including UV environmental telemetry)
     LOCK();
     bool sendNow = g.dirty;
-    StatusReport rep{g.armed, g.doorOpen, g.vibration, g.alarm, g.proximityCm};
+    StatusReport rep{g.armed, g.doorOpen, g.vibration, g.alarm, g.proximityCm, g.uvIndex};
     UNLOCK();
     if (sendNow || now - lastHeartbeat >= HEARTBEAT_MS) {
       lastHeartbeat = now;
@@ -230,8 +236,9 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.printf("\nSuraksha %s starting\n", FIRMWARE_VERSION);
-  Serial.printf("pins: reed=%d vib=%d buzzer=%d ledArmed=%d ledAlarm=%d button=%d\n", PIN_REED_SWITCH, PIN_VIBRATION, PIN_BUZZER,
-                PIN_LED_ARMED, PIN_LED_ALARM, PIN_MODE_BUTTON);
+  Serial.printf("pins: reed=%d vib=%d buzzer=%d ledArmed=%d ledAlarm=%d uv=%d button=%d\n",
+                PIN_REED_SWITCH, PIN_VIBRATION, PIN_BUZZER,
+                PIN_LED_ARMED, PIN_LED_ALARM, PIN_UV_SENSOR, PIN_MODE_BUTTON);
 
   g_mux = xSemaphoreCreateMutex();
 
@@ -243,10 +250,11 @@ void setup() {
   door.begin();
   vibration.begin();
   proximity.begin();
+  uvSensor.begin();
   security.begin(&alarmCtl, onEvent, door.isOpen());
   publishSnapshot(millis());
 
-  Serial.printf("door=%s mode=%s\n", door.isOpen() ? "OPEN" : "CLOSED", security.armed() ? "ARMED" : "DISARMED");
+  Serial.printf("door=%s mode=%s uv=%.1f\n", door.isOpen() ? "OPEN" : "CLOSED", security.armed() ? "ARMED" : "DISARMED", uvSensor.lastUvIndex());
 
   xTaskCreatePinnedToCore(netTask, "net", 12288, nullptr, 1, nullptr, 0);
 }
@@ -265,6 +273,10 @@ void loop() {
   if (proximity.update(now)) {
     Serial.printf("[proximity] object at %.0f cm\n", proximity.lastCm());
     security.onProximity();
+  }
+  if (uvSensor.update(now)) {
+    // Environmental telemetry updated - will be sent with heartbeat
+    publishSnapshot(now);
   }
 
   handleButton(now);

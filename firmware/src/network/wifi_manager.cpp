@@ -4,13 +4,29 @@
 #include "config.h"
 #include "secrets.h"
 
+static const char* activeSsid() {
+#ifdef WOKWI_SIMULATION
+  return "Wokwi-GUEST";
+#else
+  return WIFI_SSID;
+#endif
+}
+
+static const char* activePass() {
+#ifdef WOKWI_SIMULATION
+  return "";
+#else
+  return WIFI_PASSWORD;
+#endif
+}
+
 void WifiManager::begin() {
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(activeSsid(), activePass());
   lastAttempt_ = lastConnected_ = millis();
   configTime(0, 0, NTP_SERVER);  // UTC; SNTP keeps retrying until Wi-Fi is up
-  Serial.printf("[wifi] connecting to %s\n", WIFI_SSID);
+  Serial.printf("[wifi] connecting to %s\n", activeSsid());
 }
 
 bool WifiManager::connected() const { return WiFi.status() == WL_CONNECTED; }
@@ -24,8 +40,8 @@ void WifiManager::loop(uint32_t now) {
   }
   if (now - lastAttempt_ >= 8000) {  // still down: kick a fresh attempt
     lastAttempt_ = now;
-    Serial.println("[wifi] reconnecting...");
+    Serial.printf("[wifi] reconnecting to %s...\n", activeSsid());
     WiFi.disconnect();
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(activeSsid(), activePass());
   }
 }

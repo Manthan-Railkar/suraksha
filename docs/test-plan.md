@@ -20,6 +20,8 @@ Record **Pass / Fail** and the date for each run.
 | T-10 Restart recovery | Reset the ESP32 with the door closed | Reconnects, reports its real state, mode restored from flash; an old pending command is not reported as applied | |
 | T-11 Authentication | `curl -X POST localhost:8000/api/commands -H "Content-Type: application/json" -d "{\"command_type\":\"ARM\"}"` with no token | `401`; with a bad `X-Device-Token` the device endpoints also return `401` | |
 | T-12 Proximity (optional) | `ENABLE_PROXIMITY 1`, move an object into range | `PROXIMITY_DETECTED` INFO shown as "Nearby object detected"; no person/intent wording anywhere | |
+| T-13 UV Environmental Telemetry | Change UV sensor / pot voltage on GPIO35 (or press `u` in simulator) | UV Index updates on `/api/state` and in Overview / Device cards; NEVER triggers an alarm or intrusion event | |
+| T-14 Multi-Device Selection | Switch between physical device (`suraksha-esp32-01`) and simulator (`suraksha-sim-01` / `suraksha-wokwi-01`) | DeviceSelector switches active device context; status, events, alerts and commands are isolated per device | |
 
 ## Extra checks worth doing
 

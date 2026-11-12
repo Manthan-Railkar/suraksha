@@ -16,10 +16,10 @@ The ESP32 is the source of truth for mode and door state. A dashboard ARM/DISARM
 ### `POST /api/device/status` - heartbeat and current state (every ~5 s, and immediately on change)
 ```json
 { "device_id": "suraksha-esp32-01", "mode": "ARMED", "door_state": "CLOSED",
-  "vibration_state": "IDLE", "alarm_active": false, "proximity_cm": 42.0,
-  "firmware_version": "suraksha-fw-0.1.0", "device_timestamp": "2026-11-12T13:00:00Z" }
+  "vibration_state": "IDLE", "alarm_active": false, "proximity_cm": 42.0, "uv_index": 3.4,
+  "firmware_version": "suraksha-fw-0.2.0", "device_timestamp": "2026-11-12T13:00:00Z" }
 ```
-`proximity_cm`, `firmware_version`, `device_timestamp` optional. The device counts as offline after `OFFLINE_AFTER_SECONDS` (default 15) without any device request.
+`proximity_cm`, `uv_index`, `firmware_version`, `device_timestamp` optional. `uv_index` is purely independent environmental telemetry (never triggers intrusion alerts). The device counts as offline after `OFFLINE_AFTER_SECONDS` (default 15) without any device request.
 
 ### `POST /api/device/events`
 ```json
@@ -58,7 +58,8 @@ Returns `{"command": null}` or `{"command": {"command_id": 7, "command_type": "A
 | Method + path | Purpose |
 |---|---|
 | `POST /api/auth/login` `{username, password}` | Returns `{token, expires_in}` (12 h) |
-| `GET /api/state?device_id=` | Everything the Overview needs: `device` (incl. `is_online`, `seconds_since_seen`), `state`, `latest_alert`, `unacknowledged_alerts`, `last_command`, `server_time` |
+| `GET /api/devices` | Lists all registered physical and simulated devices with online/offline status, IP, last seen, mode, door, alarm, and UV index |
+| `GET /api/state?device_id=` | Everything the Overview needs: `device` (incl. `is_online`, `seconds_since_seen`), `state` (incl. `uv_index`), `latest_alert`, `unacknowledged_alerts`, `last_command`, `server_time` |
 | `GET /api/events?device_id=&limit=&before_id=&unacknowledged_only=` | Newest first, `limit` 1-200, `before_id` for paging |
 | `POST /api/events/{id}/ack` | Marks an alert acknowledged. The event is never deleted |
 | `POST /api/commands` `{command_type: "ARM"\|"DISARM", device_id}` | Creates a pending command (older pending ones become `superseded`) |

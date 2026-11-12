@@ -7,10 +7,11 @@ import "./globals.css";
 import AppShell from "@/components/shell/AppShell";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth-context";
+import { DeviceProvider } from "@/lib/device-context";
 
 export const metadata: Metadata = {
-  title: "Team Workspace — Dashboard V22",
-  description: "Animated team workspace dashboard built with Next.js, Tailwind, Motion and GSAP.",
+  title: "Suraksha — Smart Door Security System",
+  description: "Real-time ESP32 intrusion detection and environmental telemetry monitor.",
 };
 
 const themeScript = `
@@ -38,7 +39,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <AuthProvider>
-            <AppShell>{children}</AppShell>
+            <DeviceProvider>
+              <AppShell>{children}</AppShell>
+            </DeviceProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

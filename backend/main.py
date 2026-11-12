@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS device_state (
     vibration_state TEXT NOT NULL,
     alarm_active INTEGER NOT NULL DEFAULT 0,
     proximity_cm REAL,
+    uv_index REAL,
     updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS events (
@@ -131,6 +132,10 @@ CREATE TABLE IF NOT EXISTS device_commands (
 async def lifespan(_: FastAPI):
     with db() as conn:
         conn.executescript(SCHEMA)
+        # Migrate schema dynamically if uv_index column does not exist
+        cols = [c["name"] for c in conn.execute("PRAGMA table_info(device_state)").fetchall()]
+        if "uv_index" not in cols:
+            conn.execute("ALTER TABLE device_state ADD COLUMN uv_index REAL")
     yield
 
 
@@ -186,6 +191,7 @@ class StatusIn(BaseModel):
     vibration_state: Literal["IDLE", "TRIGGERED"] = "IDLE"
     alarm_active: bool = False
     proximity_cm: Optional[float] = None
+    uv_index: Optional[float] = None
     firmware_version: Optional[str] = None
     device_timestamp: Optional[str] = None
 
@@ -248,13 +254,13 @@ def device_status(body: StatusIn):
     with db() as conn:
         touch_device(conn, body.device_id, body.firmware_version)
         conn.execute(
-            "INSERT INTO device_state (device_id, mode, door_state, vibration_state, alarm_active, proximity_cm, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "INSERT INTO device_state (device_id, mode, door_state, vibration_state, alarm_active, proximity_cm, uv_index, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(device_id) DO UPDATE SET mode=excluded.mode, door_state=excluded.door_state, "
             "vibration_state=excluded.vibration_state, alarm_active=excluded.alarm_active, "
-            "proximity_cm=excluded.proximity_cm, updated_at=excluded.updated_at",
+            "proximity_cm=excluded.proximity_cm, uv_index=excluded.uv_index, updated_at=excluded.updated_at",
             (body.device_id, body.mode, body.door_state, body.vibration_state,
-             int(body.alarm_active), body.proximity_cm, now_utc()),
+             int(body.alarm_active), body.proximity_cm, body.uv_index, now_utc()),
         )
     return {"ok": True, "server_time": now_utc()}
 
@@ -315,6 +321,31 @@ def login(body: LoginIn):
     if not (ok_user and ok_pass):
         raise HTTPException(401, "Wrong username or password")
     return {"token": make_token(body.username), "expires_in": TOKEN_TTL_SECONDS}
+
+
+@app.get("/api/devices")
+def list_devices(_: str = Depends(require_user)):
+    """Lists all registered physical and simulated devices and their live status."""
+    with db() as conn:
+        expire_old_commands(conn)
+        rows = conn.execute(
+            "SELECT d.device_id, d.device_name, d.firmware_version, d.last_seen_at, "
+            "s.mode, s.door_state, s.vibration_state, s.alarm_active, s.proximity_cm, s.uv_index, s.updated_at "
+            "FROM devices d LEFT JOIN device_state s ON d.device_id = s.device_id "
+            "ORDER BY d.last_seen_at DESC"
+        ).fetchall()
+
+    result = []
+    now = datetime.now(timezone.utc)
+    for r in rows:
+        d = dict(r)
+        seen = parse_ts(d["last_seen_at"])
+        age = (now - seen).total_seconds() if seen else None
+        d["is_online"] = age is not None and age <= OFFLINE_AFTER_SECONDS
+        d["seconds_since_seen"] = round(age) if age is not None else None
+        d["alarm_active"] = bool(d.get("alarm_active", 0))
+        result.append(d)
+    return {"devices": result}
 
 
 @app.get("/api/state")

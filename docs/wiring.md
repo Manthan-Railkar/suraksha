@@ -8,13 +8,32 @@ The board is an already-assembled **EDU-ROBO V14** trainer PCB with an ESP32-WRO
 
 | Function | `config.h` name | Default | Source | Verified on board? |
 |---|---|---|---|---|
-| Reed switch input | `PIN_REED_SWITCH` | GPIO32 | **Not in the manual** - pick a free, input-capable pin that reaches a connector | [ ] |
-| Vibration sensor | `PIN_VIBRATION` | GPIO23 | Manual lists GPIO23 | [ ] module fitted? [ ] pin |
-| Buzzer | `PIN_BUZZER` | GPIO15 | Manual lists GPIO15 | [ ] |
-| LED - armed indicator | `PIN_LED_ARMED` | GPIO27 | Manual lists GPIO27/14/12/13 | [ ] shared with L293D? |
-| LED - alarm indicator | `PIN_LED_ALARM` | GPIO14 | as above | [ ] |
+| Reed switch input | `PIN_REED_SWITCH` | GPIO32 | Free input pin with internal pull-up | [ ] |
+| Vibration sensor | `PIN_VIBRATION` | GPIO23 | SW-420 digital out | [ ] |
+| Buzzer | `PIN_BUZZER` | GPIO15 | Active buzzer | [ ] |
+| LED - armed indicator | `PIN_LED_ARMED` | GPIO27 | Green LED | [ ] |
+| LED - alarm indicator | `PIN_LED_ALARM` | GPIO14 | Red LED | [ ] |
+| UV Sensor (Analog Telemetry) | `PIN_UV_SENSOR` | GPIO35 | Analog UV sensor / photodiode ADC1 | [ ] |
 | Local button (optional) | `PIN_MODE_BUTTON` | disabled (-1) | any free pin, active LOW | [ ] |
-| HC-SR04 TRIG / ECHO (optional) | `PIN_PROX_TRIG` / `PIN_PROX_ECHO` | disabled (-1) | Manual is **inconsistent** | [ ] |
+| HC-SR04 TRIG / ECHO (optional) | `PIN_PROX_TRIG` / `PIN_PROX_ECHO` | disabled (-1) | Optional proximity | [ ] |
+
+### UV Sensor (Analog Environmental Telemetry)
+Connect the analog output (OUT / A0) of the UV sensor module to **GPIO35** (ADC1 channel 7).
+- VCC -> 3.3V
+- GND -> GND
+- OUT -> GPIO35
+- **Important**: The UV sensor is purely an independent environmental indicator. The firmware samples the analog voltage, maps it to the standard WHO UV Index scale (0.0 to 15.0), and reports it in periodic telemetry (`POST /api/device/status`). It is completely decoupled from security state and never triggers intrusion alarms.
+
+## Wokwi Circuit Simulation
+For simulation without physical hardware, open `diagram.json` in [Wokwi](https://wokwi.com) or run the VS Code Wokwi extension:
+- **ESP32 DevKit V1**
+- **Slide Switch** on GPIO32 to GND representing the door (OFF = closed / LOW, ON = open / HIGH via internal pullup).
+- **Push Button** on GPIO23 to 3.3V with 10k pulldown representing vibration/knocks.
+- **Potentiometer** on GPIO35 simulating the analog UV sensor voltage.
+- **Green LED** on GPIO27 (armed indicator).
+- **Red LED** on GPIO14 (alarm indicator).
+- **Buzzer** on GPIO15.
+- Wokwi Wi-Fi automatically connects to `Wokwi-GUEST` when built with the `wokwi` environment (`-DWOKWI_SIMULATION`).
 
 ### Cautions (from the blueprint)
 

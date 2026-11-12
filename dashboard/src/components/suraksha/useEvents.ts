@@ -1,13 +1,25 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { acknowledgeEvent, getEvents, ApiError, type EventRow } from "@/lib/api";
+import { acknowledgeEvent, getEvents, ApiError, DEFAULT_DEVICE_ID, type EventRow } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useActiveDevice } from "@/lib/device-context";
 
 /**
- * Polls GET /api/events (newest page) and can page further back with `loadMore`.
+ * Polls GET /api/events (newest page) for the active device and can page further back with `loadMore`.
  * Shared by the overview, alerts and history screens.
  */
-export function useEvents({ limit = 50, intervalMs = 5000 }: { limit?: number; intervalMs?: number } = {}) {
+export function useEvents({
+  limit = 50,
+  intervalMs = 5000,
+  deviceId: explicitDeviceId,
+}: {
+  limit?: number;
+  intervalMs?: number;
+  deviceId?: string;
+} = {}) {
+  const { deviceId: contextDeviceId } = useActiveDevice();
+  const targetId = explicitDeviceId || contextDeviceId || DEFAULT_DEVICE_ID;
+
   const [latest, setLatest] = useState<EventRow[]>([]);
   const [older, setOlder] = useState<EventRow[]>([]);
   const [exhausted, setExhausted] = useState(false);
@@ -29,22 +41,30 @@ export function useEvents({ limit = 50, intervalMs = 5000 }: { limit?: number; i
 
   const refresh = useCallback(async () => {
     try {
-      const res = await getEvents({ limit });
+      const res = await getEvents({ deviceId: targetId, limit });
       setLatest(res.events);
       setLoaded(true);
       setError(null);
     } catch (err) {
       fail(err);
     }
-  }, [limit, fail]);
+  }, [targetId, limit, fail]);
+
+  // When active device changes, reset list and reload
+  useEffect(() => {
+    setLatest([]);
+    setOlder([]);
+    setExhausted(false);
+    setLoaded(false);
+    refresh();
+  }, [targetId, refresh]);
 
   useEffect(() => {
-    refresh();
     const t = setInterval(refresh, intervalMs);
     return () => clearInterval(t);
   }, [refresh, intervalMs]);
 
-  // Newest page + older pages, de-duplicated (the newest page can overlap older ones as new events arrive).
+  // Newest page + older pages, de-duplicated.
   const events = useMemo(() => {
     const byId = new Map<number, EventRow>();
     for (const e of [...older, ...latest]) byId.set(e.event_id, e);
@@ -58,7 +78,7 @@ export function useEvents({ limit = 50, intervalMs = 5000 }: { limit?: number; i
     if (!last) return;
     setLoadingMore(true);
     try {
-      const res = await getEvents({ limit, beforeId: last.event_id });
+      const res = await getEvents({ deviceId: targetId, limit, beforeId: last.event_id });
       setOlder((prev) => [...prev, ...res.events]);
       if (res.events.length < limit) setExhausted(true);
     } catch (err) {
@@ -66,9 +86,9 @@ export function useEvents({ limit = 50, intervalMs = 5000 }: { limit?: number; i
     } finally {
       setLoadingMore(false);
     }
-  }, [events, limit, fail]);
+  }, [events, targetId, limit, fail]);
 
-  /** Marks an alert acknowledged. The event is never removed - only its acknowledged state changes. */
+  /** Marks an alert acknowledged. */
   const acknowledge = useCallback(async (eventId: number) => {
     const row = await acknowledgeEvent(eventId);
     const patch = (list: EventRow[]) => list.map((e) => (e.event_id === row.event_id ? row : e));
@@ -77,5 +97,5 @@ export function useEvents({ limit = 50, intervalMs = 5000 }: { limit?: number; i
     return row;
   }, []);
 
-  return { events, loaded, error, hasMore, loadingMore, loadMore, refresh, acknowledge };
+  return { events, loaded, error, hasMore, loadingMore, loadMore, refresh, acknowledge, deviceId: targetId };
 }

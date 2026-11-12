@@ -6,6 +6,14 @@
 #include "config.h"
 #include "secrets.h"
 
+static const char* activeDeviceId() {
+#ifdef WOKWI_SIMULATION
+  return "suraksha-wokwi-01";
+#else
+  return DEVICE_ID;
+#endif
+}
+
 ApiResult ApiClient::send(const char* method, const String& path, const String& body, String* response) {
   ApiResult r;
   String url = String(BACKEND_URL) + path;
@@ -18,8 +26,6 @@ ApiResult ApiClient::send(const char* method, const String& path, const String& 
 
   bool begun;
   if (url.startsWith("https://")) {
-    // For a hosted backend, pin its root CA with secure.setCACert(...). setInsecure() skips verification
-    // and is only acceptable on a trusted network while developing.
     secure.setInsecure();
     begun = http.begin(secure, url);
   } else {
@@ -40,12 +46,13 @@ ApiResult ApiClient::send(const char* method, const String& path, const String& 
 
 ApiResult ApiClient::postStatus(const StatusReport& s) {
   JsonDocument doc;
-  doc["device_id"] = DEVICE_ID;
+  doc["device_id"] = activeDeviceId();
   doc["mode"] = s.armed ? "ARMED" : "DISARMED";
   doc["door_state"] = s.doorOpen ? "OPEN" : "CLOSED";
   doc["vibration_state"] = s.vibrationTriggered ? "TRIGGERED" : "IDLE";
   doc["alarm_active"] = s.alarmActive;
   if (s.proximityCm >= 0) doc["proximity_cm"] = s.proximityCm;
+  if (s.uvIndex >= 0) doc["uv_index"] = s.uvIndex;
   doc["firmware_version"] = FIRMWARE_VERSION;
   char ts[24];
   if (isoTimestamp(ts, sizeof(ts))) doc["device_timestamp"] = ts;
@@ -57,7 +64,7 @@ ApiResult ApiClient::postStatus(const StatusReport& s) {
 
 ApiResult ApiClient::postEvent(const Event& e) {
   JsonDocument doc;
-  doc["device_id"] = DEVICE_ID;
+  doc["device_id"] = activeDeviceId();
   doc["client_event_id"] = e.clientId;
   doc["event_type"] = eventTypeName(e.type);
   doc["severity"] = severityName(e.severity);
@@ -74,7 +81,7 @@ ApiResult ApiClient::postEvent(const Event& e) {
 ApiResult ApiClient::pollCommand(bool& found, PendingCommand& cmd) {
   found = false;
   String resp;
-  ApiResult r = send("GET", String("/api/device/commands?device_id=") + DEVICE_ID, "", &resp);
+  ApiResult r = send("GET", String("/api/device/commands?device_id=") + activeDeviceId(), "", &resp);
   if (!r.ok) return r;
 
   JsonDocument doc;
@@ -91,7 +98,7 @@ ApiResult ApiClient::pollCommand(bool& found, PendingCommand& cmd) {
 
 ApiResult ApiClient::ackCommand(uint32_t id, bool success, const char* error) {
   JsonDocument doc;
-  doc["device_id"] = DEVICE_ID;
+  doc["device_id"] = activeDeviceId();
   doc["success"] = success;
   if (!success && error) doc["error"] = error;
 

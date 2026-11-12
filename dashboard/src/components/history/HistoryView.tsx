@@ -7,13 +7,14 @@ import { HISTORY_FILTERS, matchesFilter, type HistoryFilter } from "@/lib/suraks
 import PageHeader from "@/components/suraksha/PageHeader";
 import FilterChips from "@/components/suraksha/FilterChips";
 import EventItem from "@/components/suraksha/EventItem";
+import DeviceSelector from "@/components/suraksha/DeviceSelector";
 import { useEvents } from "@/components/suraksha/useEvents";
 
 export default function HistoryView() {
   const ref = useRef<HTMLDivElement>(null);
   usePageEntrance(ref);
 
-  const { events, loaded, error, hasMore, loadingMore, loadMore, acknowledge } = useEvents({ limit: 50 });
+  const { events, loaded, error, hasMore, loadingMore, loadMore, acknowledge, deviceId } = useEvents({ limit: 50 });
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [busy, setBusy] = useState(false);
 
@@ -40,8 +41,10 @@ export default function HistoryView() {
       <div className="relative flex min-h-full w-full flex-col gap-[20px]" style={{ padding: "24px 32px 32px 110px" }}>
         <PageHeader
           title="Event History"
-          subtitle="Every event the device has reported, newest first. Times are when the backend received them."
-        />
+          subtitle={`Audit trail of all sensor and state transitions reported by ${deviceId}, newest first.`}
+        >
+          <DeviceSelector />
+        </PageHeader>
 
         <div data-fill>
           <FilterChips<HistoryFilter> id="history-filter" value={filter} onChange={setFilter} options={options} />
@@ -76,7 +79,7 @@ export default function HistoryView() {
         </Card>
 
         <p data-fill className="text-[10px] text-muted">
-          Showing {shown.length} of {events.length} loaded events. Acknowledging an alert never removes it from this list.
+          Showing {shown.length} of {events.length} loaded events for {deviceId}. Acknowledging an alert never removes it from this list.
         </p>
       </div>
     </div>

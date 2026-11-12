@@ -40,6 +40,7 @@ export default function ArmControl({
   mode,
   online,
   hasDevice,
+  deviceId,
   lastCommand,
   serverTime,
   onChanged,
@@ -47,6 +48,7 @@ export default function ArmControl({
   mode: "ARMED" | "DISARMED" | undefined;
   online: boolean;
   hasDevice: boolean;
+  deviceId?: string;
   lastCommand: CommandRow | null;
   serverTime?: string;
   onChanged: () => void;
@@ -61,13 +63,21 @@ export default function ArmControl({
   async function send(type: "ARM" | "DISARM") {
     setSending(true);
     try {
-      const cmd = await requestCommand(type);
+      const cmd = await requestCommand(type, deviceId);
       setLocalCmd(cmd);
       setConfirm(null);
-      notify({ title: `${type === "ARM" ? "Arm" : "Disarm"} requested`, description: "Waiting for the device to confirm.", type: "info" });
+      notify({
+        title: `${type === "ARM" ? "Arm" : "Disarm"} requested for ${deviceId || "device"}`,
+        description: "Waiting for the device to confirm.",
+        type: "info",
+      });
       onChanged();
     } catch (err) {
-      notify({ title: "Command not sent", description: err instanceof Error ? err.message : "Backend unreachable", type: "error" });
+      notify({
+        title: "Command not sent",
+        description: err instanceof Error ? err.message : "Backend unreachable",
+        type: "error",
+      });
     } finally {
       setSending(false);
     }

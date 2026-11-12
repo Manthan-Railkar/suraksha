@@ -9,14 +9,17 @@ import {
   Bell,
   ShieldCheck,
   Check,
-  Globe,
+  Cpu,
   Laptop,
+  Sliders,
+  Terminal,
 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Split from "@/components/ui/Split";
 import Avatar from "@/components/ui/Avatar";
 import { usePageEntrance } from "@/lib/entrance";
 import { useTheme } from "@/lib/theme-context";
+import { useActiveDevice } from "@/lib/device-context";
 import { notify } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 
@@ -24,30 +27,31 @@ export default function SettingsView() {
   const ref = useRef<HTMLDivElement>(null);
   usePageEntrance(ref);
   const { theme, toggleTheme } = useTheme();
+  const { deviceId } = useActiveDevice();
 
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [desktopPush, setDesktopPush] = useState(true);
-  const [soundEffects, setSoundEffects] = useState(false);
+  const [soundAlerts, setSoundAlerts] = useState(true);
+  const [criticalPush, setCriticalPush] = useState(true);
+  const [autoAckNormal, setAutoAckNormal] = useState(false);
 
   const handleSave = () => {
     notify({
       title: "Settings synchronized",
-      description: "Preferences saved to workspace profile.",
+      description: "Suraksha system preferences saved.",
       type: "success",
     });
   };
 
   return (
     <div ref={ref} data-page className="absolute inset-0 overflow-y-auto overflow-x-hidden">
-      <div className="relative flex flex-col w-full min-h-full" style={{ padding: "24px 32px 32px 110px" }}>
+      <div className="relative flex min-h-full w-full flex-col gap-[20px]" style={{ padding: "24px 32px 32px 110px" }}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] w-full">
           <div>
             <h1 className="font-display text-[31px] font-normal leading-none tracking-[-0.8px] text-ink">
-              <Split label="Workspace Settings">Workspace Settings</Split>
+              <Split label="System Settings">System Settings</Split>
             </h1>
             <p data-fill className="mt-[10px] text-[11px] text-muted">
-              Configure your workspace preferences, visual themes, notifications, and team permissions.
+              Configure Suraksha hardware parameters, monitoring thresholds, operator profile and display preferences.
             </p>
           </div>
 
@@ -64,7 +68,7 @@ export default function SettingsView() {
         </div>
 
         {/* Settings Grid */}
-        <div className="mt-[20px] grid grid-cols-1 lg:grid-cols-2 gap-[20px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[20px]">
           {/* Section 1: Appearance & Theme */}
           <Card className="p-[20px] flex flex-col justify-between">
             <div>
@@ -132,186 +136,139 @@ export default function SettingsView() {
             </div>
 
             <p className="mt-[18px] text-[10.5px] text-muted">
-              Theme can also be toggled instantly with the sun/moon icon in the left sidebar or the search palette.
+              Theme can also be toggled instantly with the sun/moon icon in the left sidebar or the search palette (Ctrl+K).
             </p>
           </Card>
 
-          {/* Section 2: Account Profile */}
+          {/* Section 2: Operator Identity */}
           <Card className="p-[20px]">
             <div className="flex items-center gap-[10px] mb-[16px]">
               <span className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-mint-2/70 dark:bg-mint-3/20 text-forest-2 dark:text-mint">
-                <User size={16} />
+                <ShieldCheck size={16} />
               </span>
               <div>
-                <h3 className="text-[13.5px] font-medium text-ink">Profile Details</h3>
-                <p className="text-[10px] text-muted">Your identity across the surgical workspace</p>
+                <h3 className="text-[13.5px] font-medium text-ink">Security Operator Identity</h3>
+                <p className="text-[10px] text-muted">Session credentials for dashboard authentication</p>
               </div>
             </div>
 
             <div className="flex items-center gap-[14px] p-[12px] rounded-[12px] bg-black/[.03] dark:bg-white/[.05] mb-[16px]">
-              <Avatar name="Hannah Brooks" size={46} />
+              <Avatar name="Admin Operator" size={46} />
               <div>
-                <h4 className="text-[13px] font-medium text-ink">Hannah Brooks</h4>
-                <p className="text-[10.5px] text-muted">Lead Product Designer · Workspace Studio</p>
-                <p className="text-[10px] text-muted">hannah@workspace.studio</p>
+                <h4 className="text-[13px] font-medium text-ink">Security Administrator</h4>
+                <p className="text-[10.5px] text-muted">Active Role: System Controller & Incident Response</p>
+                <p className="text-[10px] text-mint">Primary Device: {deviceId}</p>
               </div>
             </div>
 
             <div className="space-y-[10px]">
               <div>
-                <label className="text-[10.5px] font-medium text-muted">Display Name</label>
+                <label className="text-[10.5px] font-medium text-muted">Operator Username</label>
                 <input
-                  defaultValue="Hannah Brooks"
-                  className="mt-[4px] w-full rounded-[10px] bg-white/70 dark:bg-white/[.08] px-[12px] py-[8px] text-[11.5px] text-ink outline-none border border-black/[.08] dark:border-white/[.1]"
+                  readOnly
+                  value="admin"
+                  className="mt-[4px] w-full rounded-[10px] bg-white/70 dark:bg-white/[.08] px-[12px] py-[8px] text-[11.5px] text-ink outline-none border border-black/[.08] dark:border-white/[.1] cursor-not-allowed opacity-80"
                 />
               </div>
               <div>
-                <label className="text-[10.5px] font-medium text-muted">Role & Department</label>
+                <label className="text-[10.5px] font-medium text-muted">Authentication Mode</label>
                 <input
-                  defaultValue="Lead Product Designer · Neurosurgery UX"
-                  className="mt-[4px] w-full rounded-[10px] bg-white/70 dark:bg-white/[.08] px-[12px] py-[8px] text-[11.5px] text-ink outline-none border border-black/[.08] dark:border-white/[.1]"
+                  readOnly
+                  value="HMAC-SHA256 Token Session (12h TTL)"
+                  className="mt-[4px] w-full rounded-[10px] bg-white/70 dark:bg-white/[.08] px-[12px] py-[8px] text-[11.5px] text-ink outline-none border border-black/[.08] dark:border-white/[.1] cursor-not-allowed opacity-80"
                 />
               </div>
             </div>
           </Card>
 
-          {/* Section 3: Notification Toggles */}
+          {/* Section 3: Sensor Parameters & Firmware Tunables */}
           <Card className="p-[20px]">
             <div className="flex items-center gap-[10px] mb-[16px]">
               <span className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-mint-2/70 dark:bg-mint-3/20 text-forest-2 dark:text-mint">
-                <Bell size={16} />
+                <Sliders size={16} />
               </span>
               <div>
-                <h3 className="text-[13.5px] font-medium text-ink">Notification Center</h3>
-                <p className="text-[10px] text-muted">Manage activity and message alerts</p>
+                <h3 className="text-[13.5px] font-medium text-ink">Security Logic & Tunables</h3>
+                <p className="text-[10px] text-muted">Active logic parameters running on Core 1 firmware</p>
               </div>
             </div>
 
-            <div className="space-y-[14px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[12px] font-medium text-ink">Desktop Push Notifications</p>
-                  <p className="text-[10px] text-muted">Receive live notifications for call invites and mentions</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setDesktopPush(!desktopPush);
-                    notify({ title: desktopPush ? "Push alerts disabled" : "Push alerts enabled", type: "info" });
-                  }}
-                  className={cn(
-                    "relative h-[22px] w-[40px] rounded-full transition-colors",
-                    desktopPush ? "bg-forest-2 dark:bg-mint" : "bg-black/[.15] dark:bg-white/[.2]"
-                  )}
-                >
-                  <motion.div
-                    animate={{ x: desktopPush ? 20 : 2 }}
-                    className="h-[18px] w-[18px] rounded-full bg-white shadow-sm"
-                  />
-                </button>
+            <div className="space-y-[9px] text-[11.5px]">
+              <div className="flex justify-between border-b border-black/[.05] dark:border-white/[.07] pb-2">
+                <span className="text-muted">Door Debounce Filter</span>
+                <span className="font-mono text-ink">50 ms</span>
               </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[12px] font-medium text-ink">Email Daily Digest</p>
-                  <p className="text-[10px] text-muted">Summary of video reviews and team activity at 9:00 AM</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setEmailAlerts(!emailAlerts);
-                    notify({ title: emailAlerts ? "Email digest disabled" : "Email digest enabled", type: "info" });
-                  }}
-                  className={cn(
-                    "relative h-[22px] w-[40px] rounded-full transition-colors",
-                    emailAlerts ? "bg-forest-2 dark:bg-mint" : "bg-black/[.15] dark:bg-white/[.2]"
-                  )}
-                >
-                  <motion.div
-                    animate={{ x: emailAlerts ? 20 : 2 }}
-                    className="h-[18px] w-[18px] rounded-full bg-white shadow-sm"
-                  />
-                </button>
+              <div className="flex justify-between border-b border-black/[.05] dark:border-white/[.07] pb-2">
+                <span className="text-muted">Knock Detection Window</span>
+                <span className="font-mono text-ink">10,000 ms</span>
               </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[12px] font-medium text-ink">Audio Cue Feedback</p>
-                  <p className="text-[10px] text-muted">Subtle sound chimes on message receipts and huddle joins</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setSoundEffects(!soundEffects);
-                    notify({ title: soundEffects ? "Audio cues muted" : "Audio cues active", type: "info" });
-                  }}
-                  className={cn(
-                    "relative h-[22px] w-[40px] rounded-full transition-colors",
-                    soundEffects ? "bg-forest-2 dark:bg-mint" : "bg-black/[.15] dark:bg-white/[.2]"
-                  )}
-                >
-                  <motion.div
-                    animate={{ x: soundEffects ? 20 : 2 }}
-                    className="h-[18px] w-[18px] rounded-full bg-white shadow-sm"
-                  />
-                </button>
+              <div className="flex justify-between border-b border-black/[.05] dark:border-white/[.07] pb-2">
+                <span className="text-muted">Repeated Vibration Threshold</span>
+                <span className="font-mono text-ink">3 knocks (Warning)</span>
+              </div>
+              <div className="flex justify-between border-b border-black/[.05] dark:border-white/[.07] pb-2">
+                <span className="text-muted">Vibration-Then-Door Combo Window</span>
+                <span className="font-mono text-ink">10,000 ms (High Alert)</span>
+              </div>
+              <div className="flex justify-between border-b border-black/[.05] dark:border-white/[.07] pb-2">
+                <span className="text-muted">Alarm Auto-Silence Timeout</span>
+                <span className="font-mono text-ink">60,000 ms</span>
+              </div>
+              <div className="flex justify-between pt-1">
+                <span className="text-muted">Heartbeat & Status Interval</span>
+                <span className="font-mono text-ink">5,000 ms (15s offline trigger)</span>
               </div>
             </div>
           </Card>
 
-          {/* Section 4: Security & Environment */}
-          <Card className="p-[20px] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-[10px] mb-[16px]">
-                <span className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-mint-2/70 dark:bg-mint-3/20 text-forest-2 dark:text-mint">
-                  <ShieldCheck size={16} />
-                </span>
-                <div>
-                  <h3 className="text-[13.5px] font-medium text-ink">Security & Hardware</h3>
-                  <p className="text-[10px] text-muted">Two-factor auth and active device sessions</p>
-                </div>
-              </div>
-
-              <div className="space-y-[10px]">
-                <div className="flex items-center justify-between p-[12px] rounded-[10px] bg-black/[.03] dark:bg-white/[.05]">
-                  <div className="flex items-center gap-[10px]">
-                    <Laptop size={16} className="text-muted" />
-                    <div>
-                      <p className="text-[11.5px] font-medium text-ink">MacBook Pro (Lisbon, Portugal)</p>
-                      <p className="text-[9.5px] text-emerald-600 dark:text-emerald-400">Current Session · Chrome 128</p>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-emerald-500/20 px-[8px] py-[3px] text-[9.5px] font-medium text-emerald-600 dark:text-emerald-400">
-                    Active
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-[12px] rounded-[10px] bg-black/[.03] dark:bg-white/[.05]">
-                  <div className="flex items-center gap-[10px]">
-                    <Globe size={16} className="text-muted" />
-                    <div>
-                      <p className="text-[11.5px] font-medium text-ink">Clinical iPad Pro (Hospital Studio)</p>
-                      <p className="text-[9.5px] text-muted">Last active 3 hours ago</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      notify({
-                        title: "Device session revoked",
-                        description: "Clinical iPad Pro logged out.",
-                        type: "info",
-                      })
-                    }
-                    className="text-[10px] text-muted hover:text-ink cursor-pointer"
-                  >
-                    Revoke
-                  </button>
-                </div>
+          {/* Section 4: Hardware & Simulation Pinout */}
+          <Card className="p-[20px]">
+            <div className="flex items-center gap-[10px] mb-[16px]">
+              <span className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-mint-2/70 dark:bg-mint-3/20 text-forest-2 dark:text-mint">
+                <Cpu size={16} />
+              </span>
+              <div>
+                <h3 className="text-[13.5px] font-medium text-ink">ESP32 Pinout & Sensor Wiring</h3>
+                <p className="text-[10px] text-muted">Hardware mapping for physical & Wokwi simulation</p>
               </div>
             </div>
 
-            <div className="mt-[18px] flex items-center justify-between border-t border-black/[.06] dark:border-white/[.08] pt-[14px]">
-              <span className="text-[11px] text-muted">Two-Factor Authentication (2FA)</span>
-              <span className="rounded-full bg-emerald-500/20 px-[8px] py-[3px] text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                Enabled (Hardware Key)
-              </span>
+            <div className="space-y-[8px] text-[11px]">
+              <div className="flex justify-between items-center rounded-lg bg-black/[.03] dark:bg-white/[.04] p-2">
+                <div>
+                  <span className="font-semibold text-ink">Reed Switch (Door)</span>
+                  <p className="text-[9.5px] text-muted">Contact closed = LOW (Closed), Open = HIGH</p>
+                </div>
+                <span className="font-mono text-mint bg-mint/10 px-2 py-0.5 rounded text-[11px]">GPIO 32</span>
+              </div>
+              <div className="flex justify-between items-center rounded-lg bg-black/[.03] dark:bg-white/[.04] p-2">
+                <div>
+                  <span className="font-semibold text-ink">Vibration Sensor (Knock)</span>
+                  <p className="text-[9.5px] text-muted">SW-420 digital pulse trigger (Active HIGH)</p>
+                </div>
+                <span className="font-mono text-mint bg-mint/10 px-2 py-0.5 rounded text-[11px]">GPIO 23</span>
+              </div>
+              <div className="flex justify-between items-center rounded-lg bg-black/[.03] dark:bg-white/[.04] p-2">
+                <div>
+                  <span className="font-semibold text-ink">Analog UV Sensor (Telemetry)</span>
+                  <p className="text-[9.5px] text-muted">Environmental ADC input (0-3.3V, 0-15 Index)</p>
+                </div>
+                <span className="font-mono text-mint bg-mint/10 px-2 py-0.5 rounded text-[11px]">GPIO 35</span>
+              </div>
+              <div className="flex justify-between items-center rounded-lg bg-black/[.03] dark:bg-white/[.04] p-2">
+                <div>
+                  <span className="font-semibold text-ink">Active Buzzer</span>
+                  <p className="text-[9.5px] text-muted">Alarm and chirp patterns (Active HIGH)</p>
+                </div>
+                <span className="font-mono text-mint bg-mint/10 px-2 py-0.5 rounded text-[11px]">GPIO 15</span>
+              </div>
+              <div className="flex justify-between items-center rounded-lg bg-black/[.03] dark:bg-white/[.04] p-2">
+                <div>
+                  <span className="font-semibold text-ink">Armed LED / Alarm LED</span>
+                  <p className="text-[9.5px] text-muted">Armed indicator (Green) / Alarm active (Red)</p>
+                </div>
+                <span className="font-mono text-mint bg-mint/10 px-2 py-0.5 rounded text-[11px]">GPIO 27 / 14</span>
+              </div>
             </div>
           </Card>
         </div>
