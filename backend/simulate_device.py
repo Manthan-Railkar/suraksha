@@ -117,16 +117,27 @@ def poll_command() -> None:
         
         ok = True
         err = None
+        cmd_type = cmd["command_type"]
         with lock:
-            if cmd["command_type"] == "ARM" and state["door"] == "OPEN":
+            if cmd_type == "SILENCE":
+                log("COMMAND SILENCE -> alarm will silence in 5 seconds")
+                # Threaded timer to silence alarm after 5 seconds
+                def _silence_after_5s():
+                    time.sleep(5)
+                    with lock:
+                        state["alarm"] = False
+                    log("Alarm silenced after 5 seconds")
+                    send_status()
+                threading.Thread(target=_silence_after_5s, daemon=True).start()
+            elif cmd_type == "ARM" and state["door"] == "OPEN":
                 ok = False
                 err = "Door is open - close it before arming"
             else:
-                state["mode"] = "ARMED" if cmd["command_type"] == "ARM" else "DISARMED"
+                state["mode"] = "ARMED" if cmd_type == "ARM" else "DISARMED"
                 state["alarm"] = False
         
         status_str = "applied" if ok else f"failed: {err}"
-        log(f"COMMAND {cmd['command_type']} -> {status_str}")
+        log(f"COMMAND {cmd_type} -> {status_str}")
         ack_payload = {"device_id": DEVICE_ID, "success": ok}
         if err:
             ack_payload["error"] = err
@@ -181,11 +192,14 @@ def vibration() -> None:
     with lock:
         now = time.time()
         last_vib = now
-        if state["mode"] == "ARMED" and state["door"] == "CLOSED":
+        if state["door"] == "CLOSED":
             vib_times.append(now)
             vib_times[:] = [t for t in vib_times if now - t <= VIB_WINDOW_S]
             if len(vib_times) >= VIB_COUNT:
-                emit("REPEATED_VIBRATION", "WARNING")
+                if state["mode"] == "ARMED":
+                    emit("REPEATED_VIBRATION", "WARNING")
+                else:
+                    emit("REPEATED_VIBRATION", "INFO")
                 vib_times.clear()
     send_status()
 

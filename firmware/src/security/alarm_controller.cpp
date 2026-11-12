@@ -31,13 +31,22 @@ void AlarmController::trigger(AlarmLevel level, uint32_t now) {
 
 void AlarmController::reset() {
   level_ = AlarmLevel::Off;
+  silenceAt_ = 0;
   writeOutputs(false);
+}
+
+void AlarmController::silenceAfter(uint32_t ms, uint32_t now) {
+  if (level_ == AlarmLevel::Off) return;
+  silenceAt_ = now + ms;
 }
 
 void AlarmController::setArmedIndicator(bool armed) { put(PIN_LED_ARMED, armed, LED_ON_LEVEL); }
 
 void AlarmController::update(uint32_t now) {
   if (level_ == AlarmLevel::Off) return;
+  if (silenceAt_ != 0 && (int32_t)(now - silenceAt_) >= 0) {
+    return reset();
+  }
   uint32_t elapsed = now - startedAt_;
 
   if (level_ == AlarmLevel::Warning) {

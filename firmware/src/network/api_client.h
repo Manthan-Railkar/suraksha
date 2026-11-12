@@ -20,6 +20,7 @@ struct StatusReport {
 
 struct PendingCommand {
   uint32_t id;
+  char commandType[16]; // "ARM", "DISARM", "SILENCE"
   bool arm;
 };
 

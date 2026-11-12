@@ -211,7 +211,7 @@ class EventIn(BaseModel):
 
 
 class CommandIn(BaseModel):
-    command_type: Literal["ARM", "DISARM"]
+    command_type: Literal["ARM", "DISARM", "SILENCE"]
     device_id: str = DEFAULT_DEVICE_ID
 
 
@@ -414,7 +414,7 @@ def list_events(
 
 @app.post("/api/events/{event_id}/ack")
 def ack_event(event_id: int, user: str = Depends(require_user)):
-    """Marks an alert as acknowledged. The event itself is never deleted."""
+    """Marks an alert as acknowledged. If the alert was an active alarm, schedules SILENCE on the device."""
     with db() as conn:
         cur = conn.execute(
             "UPDATE events SET acknowledged_at = COALESCE(acknowledged_at, ?) WHERE event_id = ?",
@@ -423,6 +423,19 @@ def ack_event(event_id: int, user: str = Depends(require_user)):
         if cur.rowcount == 0:
             raise HTTPException(404, "Event not found")
         row = conn.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
+        
+        # When user approves/acknowledges an alert on the dashboard, dispatch a SILENCE command to the device
+        # so that the local alarm stops sounding after 5 seconds.
+        dev_id = row["device_id"]
+        conn.execute(
+            "UPDATE device_commands SET status = 'superseded' WHERE device_id = ? AND status = 'pending'",
+            (dev_id,),
+        )
+        conn.execute(
+            "INSERT INTO device_commands (device_id, command_type, requested_by, status, created_at) "
+            "VALUES (?, 'SILENCE', ?, 'pending', ?)",
+            (dev_id, user, now_utc()),
+        )
     return event_row(row)
 
 

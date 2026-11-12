@@ -72,8 +72,8 @@ static void publishSnapshot(uint32_t now) {
   UNLOCK();
 }
 
-/** Applies a dashboard ARM/DISARM that the network task left in the mailbox, then reports the outcome. */
-static void handleCommand() {
+/** Applies a dashboard ARM/DISARM/SILENCE that the network task left in the mailbox, then reports the outcome. */
+static void handleCommand(uint32_t now) {
   LOCK();
   bool pending = g.cmdPending;
   PendingCommand cmd = g.cmd;
@@ -82,7 +82,11 @@ static void handleCommand() {
 
   bool ok = true;
   const char* err = "";
-  if (cmd.arm && security.doorOpen()) {
+  if (strcmp(cmd.commandType, "SILENCE") == 0) {
+    // User acknowledged/approved alert on dashboard: silence after 5 seconds (5000ms)
+    alarmCtl.silenceAfter(5000, now);
+    Serial.println("[cmd] SILENCE applied: alarm will stop in 5 seconds");
+  } else if (cmd.arm && security.doorOpen()) {
     ok = false;
     err = "Door is open - close it before arming";
     Serial.println("[cmd] ARM rejected: door is open");
@@ -280,7 +284,7 @@ void loop() {
   }
 
   handleButton(now);
-  handleCommand();
+  handleCommand(now);
   alarmCtl.update(now);
   publishSnapshot(now);
   delay(2);

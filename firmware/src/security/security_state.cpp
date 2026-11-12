@@ -46,7 +46,7 @@ void SecurityState::onDoorChanged(bool open, uint32_t now) {
 void SecurityState::onVibration(uint32_t now) {
   anyVibration_ = true;
   lastVibration_ = now;
-  if (!armed_ || doorOpen_) return;
+  if (doorOpen_) return;
 
   // Keep only the knocks inside the window, then add this one.
   uint8_t kept = 0;
@@ -57,8 +57,13 @@ void SecurityState::onVibration(uint32_t now) {
 
   if (knockCount_ >= VIB_COUNT_THRESHOLD) {
     knockCount_ = 0;
-    alarm_->trigger(AlarmLevel::Warning, now);
-    emit(EventType::RepeatedVibration, Severity::Warning);
+    if (armed_) {
+      alarm_->trigger(AlarmLevel::Warning, now);
+      emit(EventType::RepeatedVibration, Severity::Warning);
+    } else {
+      // Disarmed continuous/repeated vibration: recorded in event history as INFO
+      emit(EventType::RepeatedVibration, Severity::Info);
+    }
   }
 }
 

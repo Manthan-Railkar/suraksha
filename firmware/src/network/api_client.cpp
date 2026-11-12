@@ -91,8 +91,9 @@ ApiResult ApiClient::pollCommand(bool& found, PendingCommand& cmd) {
 
   const char* type = c["command_type"] | "";
   cmd.id = c["command_id"] | 0;
+  strlcpy(cmd.commandType, type, sizeof(cmd.commandType));
   cmd.arm = strcmp(type, "ARM") == 0;
-  found = cmd.id != 0 && (cmd.arm || strcmp(type, "DISARM") == 0);
+  found = cmd.id != 0 && (cmd.arm || strcmp(type, "DISARM") == 0 || strcmp(type, "SILENCE") == 0);
   return r;
 }
 
