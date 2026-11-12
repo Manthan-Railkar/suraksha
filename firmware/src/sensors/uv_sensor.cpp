@@ -49,3 +49,4 @@ bool UvSensor::update(uint32_t now) {
   return false;
 #endif
 }
+

@@ -21,3 +21,4 @@ class UvSensor {
   uint16_t lastMv_ = 0;
   uint32_t lastSample_ = 0;
 };
+

@@ -2,3 +2,4 @@
 version = 1
 firmware = "firmware/.pio/build/wokwi/firmware.bin"
 elf = "firmware/.pio/build/wokwi/firmware.elf"
+

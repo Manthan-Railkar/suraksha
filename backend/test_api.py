@@ -192,3 +192,4 @@ def test_command_failed_ack(client, auth_headers, device_headers):
     assert check_res.status_code == 200
     assert check_res.json()["status"] == "failed"
     assert check_res.json()["error"] == "Door is open - close it before arming"
+
